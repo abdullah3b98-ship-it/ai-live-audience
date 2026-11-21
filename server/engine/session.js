@@ -15,10 +15,45 @@ const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 const REACTIONS = { laugh: ['😂', '🤣', '💀'], fail: ['😬', '💀', '🤦', '😂'], win: ['🔥', '👏', '🏆', '❤️'], joke: ['😂', '😐', '🙄', '🤣'], chat: ['❤️', '👍', '👀'], important: ['😮', '🔥', '👀'], game: ['🎮', '🔥'], question: ['🤔', '👀'], greet: ['👋', '❤️'], named: ['👀'] };
 const JOKE_RE = /نكت|نكته|نكتة|مره وحده|مرة وحدة|مره واحد|مرة واحد|واحد محشش|محشش|مرة في واحد|مره في واحد|اسمعوا ذي|joke|knock knock/i;
-const GREET_RE = /^(السلام|سلام|هلا|اهلا|أهلا|مرحبا|مساء|صباح|هاي|hi|hello|hey)\b/i;
+const GREET_RE = /^(هلا|اهلا|أهلا|مرحبا|مرحبتين|مساء|صباح|هاي|هلو|hi|hello|hey|yo)(?=$|[\s،,.!؟?])/i;
 const Q_RE = /(وش رأيكم|ايش رأيكم|شرايكم|شو رأيكم|ايه رأيكم|رأيكم|تتوقعون|توافقون|مين معي|what do you think|do you|should i|\?|؟)/i;
-const YES_RE = /^(صح|ايه|اي|ايوه|أيوه|بالضبط|yes|yeah|yep|correct|تمام|صحيح|نعم)\b/i;
-const NO_RE = /^(لا|غلط|no|nope|مو صح|مش صح)\b/i;
+const YES_RE = /^(صح|ايه|اي|ايوه|أيوه|بالضبط|yes|yeah|yep|correct|تمام|صحيح|نعم)(?=$|[\s،,.!؟?])/i;
+const NO_RE = /^(لا|غلط|no|nope|مو صح|مش صح)(?=$|[\s،,.!؟?])/i;
+
+// ---- فهم كلام المذيع (بدون \b لأنها ما تشتغل مع العربي) ----
+const normAr = (t) => String(t).toLowerCase().replace(/[\u064B-\u0652\u0640]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
+const STREAMER_KINDS = [
+  ['salam', /(ال)?سلام عليكم|سلام عليكن|^سلام( |$)|^السلام( |$)|assalam|salam alaikum|^salam/],
+  ['howru', /كيفكم|كيفكن|كيف حالكم|كيف الحال|كيف الحال|شلونكم|شلونك|شخباركم|شخبارك|اخباركم|عاملين ايه|ازيكم|كيفك|كيف الوضع|علومكم|how are you|how r u/],
+  ['bye', /باي( |$)|مع السلامه|بطلع|بقفل البث|بسكر البث|اشوفكم|نلتقي|بستاذن|اسيبكم|good ?bye|^bye/],
+  ['thanks', /شكرا|مشكورين|مشكور|يعطيكم العافيه|تسلمون|تسلموا|ثانكس|thank/],
+  ['love', /احبكم|بحبكم|احبكن|بحبكن|وحشتوني|اشتقت لكم|انتم احلى|انتو احلى|انتوا احلى|love you/],
+  ['insult', /اسكتو|اسكتوا|انقلعو|انطمو|انطموا|مزعجين|ازعجتوني|انتم ثقلاء|shut up/],
+  ['here', /(فيه|في|فيه) (احد|حد)|معي احد|تسمعوني|تسمعون|سامعيني|سامعني|سامعينني|وصل الصوت|الصوت واضح|can you hear|anyone here/],
+  ['suggest', /(وش|ايش|شو|ايه|شنو) (العب|نلعب|اسوي|نسوي|نسولف|نعمل)|تقترحون|اقتراحاتكم|اقترحوا|اقترحو|what should i play/],
+  ['request', /^(سووا|سوو|اكتبو|اكتبوا|قولو|قولوا|حطو|حطوا|ارسلو|ارسلوا|ابيكم|ابغاكم|بدي ياكم|عايزكم|اعملو|اعملوا|يلا اكتبو)|لا تنسون|لا تنسوا|اشتركو|تابعو|لايك|فولو/],
+];
+const OPEN_Q = /(^| )(وش|ايش|شو|ايه|ليش|ليه|لماذا|مين|منو|من هو|كم|متي|وين|فين|كيف|شلون|شنو|اشلون|what|why|who|how|when|where|which)( |$)/;
+const STOP = new Set(('انا انت انتم احنا نحن هذا هذي هاذا هاذي هذاك ذا ذي اللي الي الذي التي في على علي عن من مع الى الي لين لما اذا لو كان كانت يكون صار وش ايش شو ايه ليش ليه مين كم متى نلعب العب بلعب يلعب بنلعب نسوي اسوي بسوي قلت اقول تقول رايكم رايك برايكم احسن افضل وين كيف شلون يعني والله بس كذا كذي زي مثل عشان علشان لان لأن حق حقي حقكم تبون تبي ابي ابغى يا ياخي اخوي شباب جماعه يا جماعه طيب اوكي ok yes no the and you are is was this that what why how مره مرة مرا جدا حيل وايد كثير شوي الحين هلا هسه هلق دحين توه اليوم امس بكره ما مو مش لا ايوه اي ايه صح هو هي هم هن كل بعض اول اخر').split(' '));
+function classifyStreamer(raw, isQ) {
+  const t = normAr(raw).trim();
+  if (/^(ه{3,}|خخخ+|😂|🤣|lol|lmao)/.test(t)) return 'laughing';
+  for (const [k, re] of STREAMER_KINDS) if (re.test(t)) return k;
+  if (GREET_RE.test(t)) return 'greet';
+  if (isQ) return 'question';
+  return 'chat';
+}
+function topicOf(raw, names = []) {
+  const bad = new Set(names.map((n) => normAr(n)));
+  const words = String(raw).replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+  const cands = words.filter((w) => { const n = normAr(w).replace(/^(ال|وال|بال|لل|فال)/, ''); return n.length >= 3 && !STOP.has(normAr(w)) && !STOP.has(n) && !bad.has(normAr(w)); });
+  if (!cands.length) return '';
+  // نفضّل الأسماء على الأفعال (بنلعب/نروح/يسوي…)
+  const score = (w) => { const n = normAr(w); return n.length - (/^(ب[نتيا]|[نيت]|را?ح |سا|سن)/.test(n) && n.length <= 6 ? 3 : 0) + (/^(ال)/.test(n) ? 1 : 0) + (/[a-z]/i.test(w) ? 1 : 0); };
+  return cands.sort((a, b) => score(b) - score(a))[0];
+}
+// كم واحد يرد على المذيع حسب نوع كلامه وعدد الجمهور
+const REPLY_SHARE = { salam: [0.35, 7], greet: [0.3, 6], howru: [0.28, 5], bye: [0.35, 7], love: [0.3, 6], thanks: [0.15, 3], request: [0.3, 5], insult: [0.2, 4], here: [0.25, 5], suggest: [0.25, 4], laughing: [0.1, 2], question: [0.22, 4], chat: [0.1, 3] };
 
 const sessions = new Map();
 const FORCED = new Set(['learn', 'teach', 'learned', 'searched', 'ask', 'object', 'x']);
@@ -96,7 +131,7 @@ class LiveSession {
     const t = x.p.traits;
     // أول الداخلين يسلمون غالباً عشان الدردشة تبدأ بسرعة
     const greetP = order < 4 ? 0.85 : 0.25 + t.talk * 0.5;
-    if (!t.onlyWhenCalled && Math.random() < greetP) this.schedule(x, { kind: 'join', memory: this.memoryOn && x.p.streams_attended > 0 ? memory.recall(x.p.id, this.id, x.p.language) : null }, rnd(1500, 6000));
+    if (!t.onlyWhenCalled && Math.random() < greetP) this.schedule(x, { kind: 'join', memory: this.memoryOn && x.p.streams_attended > 0 ? memory.recall(x.p.id, this.id, x.p.language) : null }, rnd(1500, 6000), { light: order < 6 });
     else if (Math.random() < t.reactsNonText) setTimeout(() => this.react(x, pick(REACTIONS.greet)), rnd(1000, 4000));
   }
   addPersonaLive(p) {
@@ -108,49 +143,83 @@ class LiveSession {
 
   // ---------- الجدولة ونظام الدور ----------
   schedule(x, ev, delay, opts = {}) {
-    const item = { pid: x.p.id, ev, due: Date.now() + delay, priority: !!opts.priority, text: opts.text || null, regen: opts.regen, after: opts.after, replyTo: opts.replyTo, eventId: ev.eventId, typingSent: false };
-    // تقدير وقت الكتابة: شخصية تكتب ببطء تظهر "يكتب..." أطول
-    item.typingMs = Math.min(5000, 600 + (opts.estLen || 25) / (x.p.traits.speed || 5) * 1000);
+    const item = { pid: x.p.id, ev, created: Date.now(), due: Date.now() + delay, priority: !!opts.priority, text: opts.text || null, regen: opts.regen, after: opts.after, replyTo: opts.replyTo, eventId: ev.eventId, awaitLlm: !!opts.awaitLlm, light: !!opts.light, prepared: false };
     this.queue.push(item);
     x.pending = (x.pending || 0) + 1;
     return item;
   }
+  // سرعة الدردشة (رسالة/دقيقة) حسب عدد الجمهور: كثير = سريع، قليل = متوسط، قليل جداً = خفيف
+  rateFor(n) { return clamp(1.45 * Math.pow(Math.max(1, n), 0.85) * (this.activity / 1.14), 2, 45); }
+  // وقت الكتابة يتناسب مع طول الرسالة وسرعة الشخص
+  typingTime(x, text, pri) {
+    const cps = clamp(2 + (x.p.traits.speed || 5) * 0.55, 3, 8);
+    const ms = 700 + (text.length / cps) * 1000 * rnd(0.85, 1.25);
+    return pri ? Math.min(3200, ms * 0.5) : Math.min(9000, ms);
+  }
+  dropItem(it) { const i = this.queue.indexOf(it); if (i >= 0) this.queue.splice(i, 1); const x = this.parts.get(it.pid); if (x) x.pending = Math.max(0, (x.pending || 1) - 1); }
   tick() {
     const now = Date.now();
     const n = Math.max(1, this.present().length);
-    const minGap = Math.max(220, 1400 / this.activity / Math.sqrt(n / 8));
-    this.queue.sort((a, b) => (b.priority - a.priority) || (a.due - b.due));
-    for (const it of this.queue) if (!it.typingSent && it.due - now < it.typingMs && it.due > now) { it.typingSent = true; this.emit({ type: 'typing', pid: it.pid, username: this.parts.get(it.pid)?.p.username }); }
-    const idx = this.queue.findIndex((it) => it.due <= now && (it.priority || now - this.lastSent >= minGap));
-    if (idx >= 0) { const it = this.queue.splice(idx, 1)[0]; const x = this.parts.get(it.pid); if (x) x.pending = Math.max(0, (x.pending || 1) - 1); this.deliver(it); }
-    if (now >= this.nextIdle) { this.idle(); this.nextIdle = now + rnd(0.6, 1.6) * 9000 / this.activity / Math.sqrt(n / 6); }
-    // بعض الشخصيات تغادر أو تنضم بشكل طبيعي
+    const rate = this.rateFor(n);
+    this.tokens = Math.min(2, (this.tokens ?? 1) + (now - (this.lastTick || now)) * rate / 60000); this.lastTick = now;
+    const focus = now < (this.focusUntil || 0);
+    // 1) إرسال الجاهز (انتهى من الكتابة)، مع فاصل بسيط بين الرسائل
+    if (now - this.lastSent >= 450) {
+      const ready = this.queue.filter((it) => it.prepared && it.readyAt <= now).sort((a, b) => (b.priority - a.priority) || (a.readyAt - b.readyAt))[0];
+      if (ready) { this.dropItem(ready); this.lastSent = now; this.sendPrepared(ready); }
+    }
+    // 2) تجهيز الرسائل المستحقة: ردود المذيع أولاً دائماً، والباقي حسب السرعة المسموحة
+    const waiting = this.queue.filter((it) => !it.prepared && it.due <= now).sort((a, b) => (b.priority - a.priority) || (a.due - b.due));
+    let preparedNon = this.queue.filter((it) => it.prepared && !it.priority).length;
+    for (const it of waiting) {
+      if (!it.priority && now - it.due > 25000) { this.dropItem(it); continue; } // رد قديم ما عاد له معنى
+      if (it.awaitLlm && !it.text && !it.llmDone && now - it.created < 6000) continue;
+      if (!it.priority) { if (focus || this.tokens < (it.light ? -1 : 1) || preparedNon >= 2) continue; }
+      if (!this.prepare(it)) { this.dropItem(it); continue; }
+      this.tokens = Math.max(-2, this.tokens - 1);
+      if (!it.priority) preparedNon++;
+    }
+    // 3) سوالف عامة بين الجمهور — تتوقف لما يتكلم المذيع
+    if (!focus && now >= this.nextIdle) {
+      const backlog = this.queue.filter((it) => !it.priority && !it.prepared).length;
+      if (this.tokens >= 0.5 && backlog < 3) this.idle();
+      this.nextIdle = now + (60000 / (rate * 0.55)) * rnd(0.6, 1.4);
+    }
     if (this.s.dynamicJoins && Math.random() < 0.0015 && this.present().length < this.maxAudience) this.addRandom(1, true);
   }
 
-  deliver(it) {
+  // يجهز نص الرسالة ويبدأ مؤشر «يكتب…» بمدة تناسب طولها
+  prepare(it) {
     const x = this.parts.get(it.pid);
-    if (!this.canSpeak(x)) return;
+    if (!this.canSpeak(x)) return false;
     let text = it.text, intent = it.ev.intent;
     const forced = FORCED.has(it.ev.kind);
-    if (text && forced && it.regen && !this.guard.check(text, x.p.id).ok) text = it.regen() || text; // إعادة صياغة بدل التكرار
-    if (text && !forced && !this.guard.check(text, x.p.id).ok) text = null; // نص مولّد مسبقاً (LLM) صار مكرراً
-    if (!text && forced) return;
+    if (text && forced && it.regen && !this.guard.check(text, x.p.id).ok) text = it.regen() || text;
+    if (text && !forced && !this.guard.check(text, x.p.id).ok) text = null;
+    if (!text && forced) return false;
     if (!text) {
       const d = it.ev.decided || decide(x.p, it.ev, this.ctxFor(x));
-      if (!d) return;
-      if (d.reaction) return this.react(x, d.reaction);
+      if (!d) return false;
+      if (d.reaction) { this.react(x, d.reaction); return false; }
       intent = d.intent;
       text = phrase(x.p, d.intent, d.vars, this.guard, { suffix: d.suffix, long: d.long });
-      if (!text) { if (Math.random() < x.p.traits.reactsNonText) this.react(x, pick(REACTIONS[it.ev.kind] || REACTIONS.chat)); return; }
+      if (!text) { if (Math.random() < x.p.traits.reactsNonText) this.react(x, pick(REACTIONS[it.ev.kind] || REACTIONS.chat)); return false; }
       text = sprinkleLearned(text, d.intent, x.words, this.level.curse > 0.3, x.p.id);
       if (d.intent === 'curse') this.curseLog.push(Date.now());
     }
-    if (!isSafe(text)) return;
-    this.guard.record(text, x.p.id);
-    this.sendMessage(x, text, { kind: it.ev.kind === 'named' ? 'named' : 'chat', intent, replyTo: it.replyTo, eventId: it.eventId });
-    if (it.after) it.after(text, intent);
-    this.maybeChain(x, text, intent, it.ev.depth || 0);
+    if (!isSafe(text)) return false;
+    it.text = text; it.intent = intent; it.prepared = true;
+    it.readyAt = Date.now() + this.typingTime(x, text, it.priority);
+    this.emit({ type: 'typing', pid: x.p.id, username: x.p.username, ms: it.readyAt - Date.now() });
+    return true;
+  }
+  sendPrepared(it) {
+    const x = this.parts.get(it.pid);
+    if (!this.canSpeak(x)) return;
+    this.guard.record(it.text, x.p.id);
+    this.sendMessage(x, it.text, { kind: it.ev.kind === 'named' ? 'named' : 'chat', intent: it.intent, replyTo: it.replyTo, eventId: it.eventId });
+    if (it.after) it.after(it.text, it.intent);
+    if (!(Date.now() < (this.focusUntil || 0)) || it.ev.fromStreamer) this.maybeChain(x, it.text, it.intent, it.ev.depth || 0, it.ev.fromStreamer);
   }
 
   sendMessage(x, text, { kind = 'chat', intent = '', replyTo = null, eventId = null } = {}) {
@@ -166,8 +235,9 @@ class LiveSession {
   react(x, emoji) { if (!this.canSpeak(x)) return; this.saveMsg(x.p.id, emoji, 'reaction'); this.emit({ type: 'reaction', pid: x.p.id, username: x.p.username, emoji }); }
 
   // تفاعل الشخصيات مع بعضها
-  maybeChain(x, text, intent, depth) {
+  maybeChain(x, text, intent, depth, fromStreamer = false) {
     if (depth >= 3) return;
+    if (fromStreamer && Math.random() < 0.75) return; // بعد ما يرد على المذيع غالباً ما يبدأ نقاش جانبي
     if (intent === 'ask_meaning') return; // يعالج في نظام التعلم
     const others = this.present().filter((o) => o !== x && this.canSpeak(o) && !o.p.traits.onlyWhenCalled && !(o.pending > 1));
     if (!others.length) return;
@@ -183,8 +253,26 @@ class LiveSession {
     });
   }
 
+  // يختار عدد مناسب من الجمهور يردون على المذيع بسرعة (أولوية على سوالفهم)
+  replyToStreamer(ev, exclude = new Set()) {
+    const ps = this.present().filter((x) => this.canSpeak(x) && !exclude.has(x.p.id) && !x.p.traits.onlyWhenCalled);
+    if (!ps.length) return 0;
+    const [share, max] = REPLY_SHARE[ev.kind] || REPLY_SHARE.chat;
+    let count = clamp(Math.round(1 + ps.length * share * rnd(0.7, 1.3)), 1, Math.min(max, ps.length));
+    if (ev.kind === 'chat' && ps.length <= 4 && Math.random() < 0.3) count = 1;
+    const pool = ps.map((x) => ({ x, w: (x.p.traits.talk * x.talkMult + 0.35) * (x.p.traits.importantOnly ? 0.25 : 1) * (x.pending > 1 ? 0.3 : 1) * rnd(0.5, 1.5) })).sort((a, b) => b.w - a.w);
+    const chosen = pool.slice(0, count).map((o) => o.x);
+    const replyTo = { name: this.streamer || 'المذيع', text: ev.voice ? '' : String(ev.text).slice(0, 60), streamer: true }; // كلامه بالصوت ما ينعرض ولا حتى كاقتباس
+    let t = rnd(400, 1200);
+    chosen.forEach((x, i) => {
+      this.schedule(x, ev, t, { priority: true, replyTo: i === 0 || Math.random() < 0.4 ? replyTo : null, awaitLlm: llm.enabled() });
+      t += rnd(500, 1600);
+    });
+    if (llm.enabled()) this.llmFill(ev, chosen);
+    return chosen.length;
+  }
   // اختيار من يرد على حدث بحسب أهميته ونشاط كل شخصية
-  dispatch(ev, importance, exclude = new Set()) {
+  dispatch(ev, importance, exclude = new Set(), opts = {}) {
     const ps = this.present().filter((x) => this.canSpeak(x) && !exclude.has(x.p.id));
     const n = ps.length; if (!n) return [];
     const cap = Math.max(1, Math.min(14, Math.ceil(n * (0.12 + 0.4 * importance) * this.activity)));
@@ -202,7 +290,7 @@ class LiveSession {
     chosen.forEach((x, i) => {
       const quick = ['fail', 'win', 'joke'].includes(ev.kind);
       const delay = rnd(quick ? 500 : 1200, quick ? 2500 : 4000) + (1 - importance) * rnd(0, 2500) + i * rnd(500, 1800);
-      this.schedule(x, ev, delay);
+      this.schedule(x, ev, opts.priority ? Math.min(delay, 1500 + i * 1200) : delay, { priority: !!opts.priority, awaitLlm: llm.enabled() && !!opts.priority });
     });
     if (llm.enabled() && chosen.length) this.llmFill(ev, chosen);
     return chosen;
@@ -222,11 +310,20 @@ class LiveSession {
         if (r.text && isSafe(r.text)) it.text = String(r.text).slice(0, 300);
       }
     } catch (e) { this.lastLlmError = e.message; }
+    for (const q of this.queue) if (q.ev === ev) q.llmDone = true;
   }
 
   idle() {
     const ps = this.present().filter((x) => this.canSpeak(x) && !x.p.traits.onlyWhenCalled && !x.p.traits.importantOnly && !(x.pending > 0));
     if (!ps.length) return;
+    // يتذكرون آخر شي قاله المذيع ويعلقون عليه بدل كلام عشوائي
+    const ls = this.lastStreamer;
+    if (ls && ls.topic && Date.now() - ls.ts < 45000 && Math.random() < 0.3 && !(ls.echoed >= 2)) {
+      ls.echoed = (ls.echoed || 0) + 1;
+      const y = pick(ps);
+      this.schedule(y, { kind: 'chat', fromStreamer: true, topic: ls.topic, text: ls.text, arabic: /[\u0600-\u06FF]/.test(ls.text) }, rnd(300, 1200), { replyTo: { name: this.streamer || 'المذيع', text: ls.text.slice(0, 60), streamer: true } });
+      return;
+    }
     // اختيار متحدث حسب نشاطه
     const tot = ps.reduce((a, x) => a + x.p.traits.talk * x.talkMult + 0.02, 0); let r = Math.random() * tot; let x = ps[0];
     for (const c of ps) if ((r -= c.p.traits.talk * c.talkMult + 0.02) <= 0) { x = c; break; }
@@ -275,27 +372,38 @@ class LiveSession {
       if (!x.present) this.join(x.p.id); // كان في قائمة الجمهور ولم يدخل بعد: يدخل ويرد
       if (!this.canSpeak(x)) { this.system(`${x.p.username} ${x.blocked ? 'ممنوع من الكتابة' : 'مكتوم'} حالياً`); continue; }
       const ev = { kind: 'named', text, arabic, isQuestion, eventId: this.record('named', text, 0.65, {}, pid) };
-      this.schedule(x, ev, rnd(1200, 2600), { priority: true, replyTo: { name: this.streamer || 'المذيع', text: text.slice(0, 60), streamer: true } });
+      this.schedule(x, ev, rnd(700, 1600), { priority: true, awaitLlm: llm.enabled(), replyTo: { name: this.streamer || 'المذيع', text: voice ? '' : text.slice(0, 60), streamer: true } });
       if (llm.enabled()) this.llmFill(ev, [x], true);
     }
     const exclude = new Set(mentioned);
 
-    // 3) تصنيف الحدث
+    // 3) فهم الكلام والرد عليه بأولوية (الجمهور يسمعك أنت أولاً)
+    const now = Date.now();
     let kind = 'chat', importance = 0.4;
-    const ev = { text, arabic };
+    const ev = { text, arabic, fromStreamer: true, voice };
     if (JOKE_RE.test(text) && text.length > 15) {
       kind = 'joke'; importance = 0.75;
       const old = memory.findOldJoke(text, this.id);
       ev.oldJoke = !!old; if (old) ev.oldJokeSeenBy = new Set(db.prepare("SELECT persona_id FROM memories WHERE event_id=?").all(old.id).map((r) => r.persona_id));
       ev.quality = (hash(text.replace(/\s/g, '')) % 1000) / 1000 * 0.8 + (/[؟?!]/.test(text) ? 0.1 : 0) + Math.min(0.1, text.length / 1500);
       ev.eventId = this.record('joke', text, 0.7, { quality: ev.quality });
-    } else if (GREET_RE.test(text)) { kind = 'greet'; importance = 0.55; }
-    else if (isQuestion) { kind = 'question'; importance = mentioned.length ? 0.2 : 0.6; }
+    } else kind = classifyStreamer(text, isQuestion);
     ev.kind = kind;
-    if (!mentioned.length || kind === 'joke') this.dispatch(ev, importance, exclude);
+    ev.open = kind === 'question' && OPEN_Q.test(normAr(text));
+    ev.topic = topicOf(text, [this.streamer, ...[...this.parts.values()].map((x) => x.p.username)]);
+    this.lastStreamer = { text, kind, topic: ev.topic, ts: now, echoed: 0 };
+    // الكلام المتواصل بالصوت: ما يردون على كل جملة عادية
+    const skipChat = voice && kind === 'chat' && now - (this.lastVoiceReply || 0) < 7000;
+    if (kind === 'joke') { this.dispatch(ev, importance, exclude, { priority: true }); this.focusUntil = now + 8000; }
+    else if (!skipChat && !(mentioned.length && (kind === 'chat' || kind === 'question'))) {
+      const n = this.replyToStreamer(ev, exclude);
+      if (voice && kind === 'chat') this.lastVoiceReply = now;
+      if (n) this.focusUntil = Math.max(this.focusUntil || 0, now + 5000 + n * 1600);
+    }
+    if (mentioned.length) this.focusUntil = Math.max(this.focusUntil || 0, now + 6000);
 
-    // 4) الكلمات المجهولة
-    this.checkUnknownWords(text);
+    // 4) الكلمات المجهولة (للكتابة فقط — التعرف على الصوت يغلط في الكلمات)
+    if (!voice) this.checkUnknownWords(text);
   }
 
   action(type, text = '') {
@@ -395,11 +503,20 @@ class LiveSession {
         if (guesser) this.schedule(guesser, { kind: 'object' }, rnd(3500, 6000), { text: phrase(guesser.p, 'object_guess', { o: guesser.p.language === 'en' ? o.label : ar }, this.guard), regen: () => phrase(guesser.p, 'object_guess', { o: guesser.p.language === 'en' ? o.label : ar }, this.guard) });
         // يتعلمون بأنفسهم: لو ما صححتهم خلال ثواني، يعتمدون اللي شافوه ويحفظونه
         const label = o.label;
+        const sc = o.score || 0; this.objStats = this.objStats || new Map();
+        const st = this.objStats.get(label) || { n: 0, best: 0 }; st.n++; st.best = Math.max(st.best, sc); this.objStats.set(label, st);
         setTimeout(async () => {
           if (this.stopped || !this.pendingObject || this.pendingObject.label !== label) return;
           this.pendingObject = null;
-          const d = this.researchOn ? await learning.wikiSummary(label === 'remote' ? 'Remote control' : label).catch(() => null) : null;
-          this.selfLearnObject(label, ar, d || null, asker);
+          // ما يعتمدونه إلا إذا الكشف قوي أو تكرر؛ غير كذا يقولون إنهم مو متأكدين
+          if (st.best >= 0.75 || (st.n >= 2 && st.best >= 0.66)) {
+            const d = this.researchOn ? await learning.wikiSummary(label === 'remote' ? 'Remote control' : label).catch(() => null) : null;
+            this.selfLearnObject(label, ar, d || null, asker);
+          } else {
+            learning.saveObject(label, ar, 'guess', 'vision');
+            const y = this.present().filter((z) => this.canSpeak(z) && !z.p.traits.onlyWhenCalled)[0];
+            if (y) { const en = y.p.language === 'en'; this.schedule(y, { kind: 'object' }, rnd(800, 2000), { text: en ? `not sure, maybe a ${label}?` : pick([`مو متأكد، يمكن ${ar}؟`, `مدري والله، شكله ${ar} بس مو متأكد`, `يمكن ${ar}؟ ما بان زين`, `ما وضح لي، ${ar} يمكن؟`]) }); }
+          }
         }, rnd(9000, 13000));
       } else {
         this.schedule(asker, { kind: 'object' }, rnd(2000, 4000), { text: phrase(asker.p, 'object_guess', { o: asker.p.language === 'en' ? o.label : ar }, this.guard), regen: () => phrase(asker.p, 'object_guess', { o: asker.p.language === 'en' ? o.label : ar }, this.guard) });

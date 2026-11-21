@@ -37,12 +37,31 @@ const results = {};
   results.bbox = await p.waitForFunction(() => document.querySelector('.bbox')?.style.display === 'block', null, { timeout: 60000 }).then(() => true).catch(() => false);
   await sleep(8000);
   await p.screenshot({ path: path.join(OUT, '02-live-desktop.png') });
-  // الكلام بالصوت لا يظهر (نرسل رسالة voice مباشرة عبر اتصال ثاني بنفس الكوكي)
+  // يسمعونه: نحقن نتيجة التعرف على الصوت في نفس الدالة اللي يستخدمها المتصفح + رسالة مكتوبة
   const id = +p.url().split('/').pop();
-  const cookies = await ctx.cookies(); const cookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
-  const WebSocket = require('ws');
-  await new Promise((res) => { const ws = new WebSocket(BASE.replace('http', 'ws') + '/ws?stream=' + id, { headers: { cookie } }); ws.on('open', () => { ws.send(JSON.stringify({ type: 'voice', text: 'الو الو تجربة' })); setTimeout(() => { ws.close(); res(); }, 4000); }); ws.on('error', (e) => { results.wsCookieErr = e.message; res(); }); });
-  results.voiceShown = await p.locator('#chat >> text=الو الو تجربة').count();
+  results.speechSupported = await p.evaluate(() => !!(window.SpeechRecognition || window.webkitSpeechRecognition));
+  results.speechAutoOn = await p.evaluate(() => window.__alaSpeechOn && window.__alaSpeechOn());
+  const PM = '#chat .msg:not(.join):not(.system):not(.streamer)';
+  async function probe(label, fn, re) {
+    const before = await p.locator(PM).count(); const t0 = Date.now(); await fn();
+    let firstMs = null, match = null; const seen = [];
+    while (Date.now() - t0 < 10000) {
+      const all = await p.locator(PM + ' .t').allInnerTexts(); const fresh = all.slice(before);
+      if (fresh.length && firstMs === null) firstMs = Date.now() - t0;
+      for (const t of fresh) if (!seen.includes(t)) seen.push(t);
+      if (re && match === null) { const k = fresh.findIndex((t) => re.test(t)); if (k >= 0) match = Date.now() - t0; }
+      await sleep(150);
+    }
+    return { label, firstMs, matchMs: match, msgsIn10s: seen.length, sample: seen.slice(0, 5) };
+  }
+  results.voiceSalam = await probe('voice: السلام عليكم', () => p.evaluate(() => window.__alaSpeech('السلام عليكم يا شباب')), /عليكم السلام|وعليكم|salam|wa alaikum/i);
+  results.voiceShown = await p.locator('#chat >> text=السلام عليكم يا شباب').count();
+  results.voiceQuestion = await probe('voice: question', () => p.evaluate(() => window.__alaSpeech('وش رأيكم في اللعبة اليوم')), null);
+  const input = p.locator('.chat-input input, input[placeholder*="اكتب للجمهور"]').first();
+  results.typedHowru = await probe('typed: كيفكم', async () => { await input.fill('كيفكم يا جماعة؟'); await input.press('Enter'); }, /الحمد|بخير|تمام|طيب|كويس|زين|good|fine|ماشي|منيح|زينين/i);
+  const someone = await p.locator(PM + ' .u').first().innerText();
+  results.typedMention = await probe('typed: @' + someone, async () => { await input.fill(`@${someone} وش أخبارك؟`); await input.press('Enter'); }, null);
+  results.mentionReplied = await p.locator(PM).filter({ hasText: someone }).count();
   // مشاركة الشاشة
   await p.click('.controls >> text=مشاركة الشاشة'); await sleep(3000);
   results.screenShare = await p.evaluate(() => { const v = document.querySelector('.video-wrap video'); const t = v.srcObject && v.srcObject.getVideoTracks()[0]; return { screenClass: v.classList.contains('screen'), track: t ? t.label : null, live: t ? t.readyState : null }; });

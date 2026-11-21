@@ -69,12 +69,24 @@ function decide(persona, ev, ctx) {
 
   if (en && ev.arabic && !['named', 'join', 'idle', 'reply', 'fail', 'win', 'object'].includes(ev.kind)) {
     // الأجنبي لا يفهم العربية: يتفاعل مع ما يراه فقط
-    if (ev.kind === 'joke' || ev.kind === 'chat' || ev.kind === 'question' || ev.kind === 'greet') return Math.random() < 0.45 ? r('not_understand') : null;
+    if (['salam', 'greet', 'bye'].includes(ev.kind)) return r(ev.kind === 'bye' ? 'bye_reply' : 'salam_reply');
+    if (ev.kind === 'joke' || ev.kind === 'chat' || ev.kind === 'question' || ev.kind === 'howru' || ev.kind === 'request' || ev.kind === 'here') return Math.random() < 0.45 ? r('not_understand') : null;
   }
   switch (ev.kind) {
     case 'join': if (ev.memory && ctx.memoryOn && Math.random() < 0.35) return r('remember', { vars: { e: ev.memory.text } });
       return r(persona.streams_attended > 0 && ctx.memoryOn ? 'greet_back' : (persona.streams_attended > 0 ? 'greet' : pick(['greet', 'greet', 'new_join'])));
-    case 'greet': return r(weighted({ streamer_greet_reply: 3, greet: 1, respectful: 1 - rude }));
+    case 'greet': return r(weighted({ streamer_greet_reply: 3, greet: 1, respectful: (1 - rude) * 0.5 }));
+    // ---- كلام المذيع نفسه (أولوية) ----
+    case 'salam': return r('salam_reply');
+    case 'howru': return r(Math.random() < 0.8 ? 'howru_reply' : 'salam_reply');
+    case 'thanks': return r('thanks_reply');
+    case 'request': return r(weighted({ request_ok: 3, ack: 0.6, tease: tease * 0.4 }));
+    case 'love': return r(weighted({ love_back: 3, praise: 1 }));
+    case 'bye': return r('bye_reply');
+    case 'insult': return r(weighted({ defensive: 2 + (1 - rude), tease: tease * 1.5, rude: rude * 0.8 }));
+    case 'here': return r('here_reply');
+    case 'suggest': return r(weighted({ suggest: 3, answer_open: 0.7, opinion: 0.6 }));
+    case 'laughing': return r(weighted({ laugh: 2, laugh_rare: 1, ack: 0.4 }));
     case 'joke': {
       if (ev.oldJoke && Math.random() < 0.65) return r('joke_old', { suffix: ev.oldJokeSeenBy?.has(persona.id) ? (en ? '(you told it last stream)' : pick(['قلتها البث اللي فات', 'سمعناها منك قبل', 'نفس نكتة البث الماضي'])) : '' });
       const diff = ev.quality - t.humor + rnd(-0.15, 0.15);
@@ -92,10 +104,18 @@ function decide(persona, ev, ctx) {
     case 'game': return r(weighted({ hype: 1 + t.hype * 2, question: t.curiosity * 2, idle_games: (persona.interests || []).includes('games') ? 2 : 0.5, criticize: critic, bored: critic * 0.5 }));
     case 'important': return r(weighted({ hype: 2, laugh: 0.8, question: t.curiosity * 1.5, opinion: 1 }));
     case 'question': {
+      // سؤال مفتوح (وش/ليش/مين…) ما يُجاب بـ«اي/لا»
+      if (ev.open) return r(weighted({ answer_open: 2.4, opinion: ev.fromStreamer ? 0.3 : 1.4 + t.debate, echo: ev.topic ? 1.2 : 0, tease: tease * 0.3 }), { vars: { t: ev.topic || '' } });
+      // نفس الشخص ما يناقض نفسه في نفس السؤال
       const yes = 1 - t.contrarian, no = t.contrarian + critic * 0.5;
-      return r(weighted({ answer_yes: yes * 2, answer_no: no * 2, answer_meh: 0.8, opinion: 1.2 + t.debate, tease: tease * 0.5 }));
+      return r(weighted({ answer_yes: yes * 2, answer_no: no * 2, answer_meh: 0.8, opinion: 1 + t.debate * 0.5 }));
     }
     case 'chat': {
+      if (ev.fromStreamer) {
+        // كلام عادي من المذيع: يردون عليه هو، بشي له علاقة بكلامه
+        if (canCurse && Math.random() < 0.15) return r('curse');
+        return r(weighted({ ack: 2.2, echo: ev.topic ? 2.2 : 0, question: t.curiosity * 0.15, praise: (1 - critic) * 0.4, tease: tease * 0.5, opinion: t.debate * 0.15, laugh_rare: /ه{3,}|😂|lol/i.test(ev.text || '') ? 2 : 0.2 }), { vars: { t: ev.topic || '' } });
+      }
       if (canCurse && Math.random() < 0.5) return r('curse');
       return r(weighted({ praise: (1 - critic) * 0.8 + t.hype * 0.5, tease: tease * 2, criticize: critic * 1.4, answer_meh: 0.6, question: t.curiosity * 1.5, laugh_rare: 0.4, opinion: t.debate, rude: rude * 0.5, respectful: (1 - rude) * 0.4, joke_sarcastic: sarcasm * 0.7 }));
     }

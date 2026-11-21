@@ -32,7 +32,7 @@ export async function renderLive(app, id) {
   const viewers = h('span', { class: 'pill' }, ic('eye', 15), vCount);
   const clock = h('span', { class: 'pill' }, '00:00:00');
   const net = h('span', { class: 'pill warn', style: { display: 'none' } }, ic('wifiOff', 15), 'يعاد الاتصال…');
-  const micPill = h('span', { class: 'pill', style: { display: 'none' }, title: 'يسمع اسمك بالصوت (ما يظهر كلامك)' }, ic('mic', 15));
+  const micPill = h('span', { class: 'pill', style: { display: 'none' }, title: 'يسمعونك بالصوت (كلامك ما يظهر)' }, ic('mic', 15));
   const visPill = h('span', { class: 'pill', style: { display: 'none' }, title: 'الجمهور يشوف الكاميرا' }, ic('scan', 15));
   const wrap = h('div', { class: 'video-wrap' }, ph, video, bbox, floaters,
     h('div', { class: 'ov-top' }, h('span', { class: 'live-badge' }, 'LIVE'), viewers, clock, info.game ? h('span', { class: 'pill gamep' }, ic('game', 15), info.game) : null, h('span', { class: 'grow' }), visPill, micPill, net));
@@ -97,7 +97,7 @@ export async function renderLive(app, id) {
     else if (msg.kind === 'streamer') el = h('div', { class: 'msg streamer' }, h('span', { class: 'u', style: { color: 'var(--green)' } }, msg.username || 'أنت'), ': ', h('span', { class: 't' }, msg.text));
     else if (msg.kind === 'voice') return; // كلامك بالصوت ما ينعرض
     else {
-      const rq = msg.replyTo ? h('span', { class: 'rq' }, msg.replyTo.streamer ? `↩ يرد عليك: «${msg.replyTo.text}»` : `↩ رداً على ${msg.replyTo.name}${msg.replyTo.text ? ': ' + msg.replyTo.text : ''}`) : null;
+      const rq = msg.replyTo ? h('span', { class: 'rq' }, msg.replyTo.streamer ? (msg.replyTo.text ? `↩ يرد عليك: «${msg.replyTo.text}»` : '↩ يرد عليك') : `↩ رداً على ${msg.replyTo.name}${msg.replyTo.text ? ': ' + msg.replyTo.text : ''}`) : null;
       el = h('div', { class: 'msg ' + (msg.kind === 'named' ? 'named' : '') }, rq, h('img', { class: 'av', src: msg.avatar, alt: '' }), msg.flag ? msg.flag + ' ' : '', h('span', { class: 'u', style: { color: colorFor(msg.username) }, onclick: (e) => personaMenu(msg.pid, e) }, msg.username), ': ', h('span', { class: 't' }, msg.text));
     }
     scrollKeep(() => chat.append(el));
@@ -133,7 +133,7 @@ export async function renderLive(app, id) {
     popAt(e,
       item(L.visionOn ? 'eye' : 'scan', L.visionOn ? 'الجمهور يشوف الكاميرا (شغّال)' : 'خل الجمهور يشوف الكاميرا', toggleVision, L.visionOn ? 'on' : ''),
       visionKey ? item('sparkles', 'خلهم يعلقون على اللقطة الحين', () => snapshot(false)) : null,
-      item(L.speechOn ? 'micOff' : 'mic', L.speechOn ? 'إيقاف سماع اسمك بالصوت' : 'سماع اسمك بالصوت (بدون عرض كلامك)', toggleSpeech, L.speechOn ? 'on' : ''),
+      item(L.speechOn ? 'micOff' : 'mic', L.speechOn ? 'إيقاف السماع بالصوت' : 'تشغيل السماع بالصوت (كلامك ما ينعرض)', toggleSpeech, L.speechOn ? 'on' : ''),
       item('rec', L.rec && L.rec.state === 'recording' ? 'إيقاف التسجيل وحفظه' : 'تسجيل البث', toggleRec, L.rec && L.rec.state === 'recording' ? 'on' : ''));
   }
   function eventsMenu(e) {
@@ -211,10 +211,29 @@ export async function renderLive(app, id) {
       try {
         const preds = await L.model.detect(video);
         const W = video.videoWidth, H = video.videoHeight, mirror = !video.classList.contains('screen');
-        const objs = preds.filter((p) => p.class !== 'person' && p.score > 0.35).map((p) => { const [x, y, w, hh] = p.bbox; const nx = mirror ? x / W : 1 - (x + w) / W; return { label: p.class, score: +p.score.toFixed(2), bbox: [nx, y / H, w / W, hh / H] }; });
+        const objs = filterDetections(preds, W, H, !mirror).map((p) => { const [x, y, w, hh] = p.bbox; const nx = mirror ? x / W : 1 - (x + w) / W; return { label: p.class, score: +p.score.toFixed(2), bbox: [nx, y / H, w / W, hh / H] }; });
         if (objs.length) send({ type: 'detect', objects: objs }, true);
       } finally { if (L) L.detecting = false; }
-    }, 2500);
+    }, 1500);
+  }
+  // كشف أذكى: عتبة أعلى، تجاهل أجزاء الجسم، ولازم الشي يثبت في عدة لقطات متتالية
+  function filterDetections(preds, W, H, screen) {
+    const persons = preds.filter((p) => p.class === 'person' && p.score > 0.5).map((p) => p.bbox);
+    const area = (b) => b[2] * b[3];
+    const inter = (a, b) => Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]));
+    const frame = [];
+    for (const p of preds) {
+      if (p.class === 'person') continue;
+      let th = CONFUSABLE.has(p.class) ? 0.75 : 0.62;
+      if (OUTDOOR.has(p.class)) th = screen ? 0.7 : 0.88; // سيارة/حيوان قدام الكاميرا غالباً يد أو خلفية
+      if (p.score < th) continue;
+      if (!screen && area(p.bbox) > W * H * 0.6) continue; // يغطي الصورة كلها = غلط غالباً
+      // صندوق داخل الشخص وكبير نسبياً = غالباً يده أو وجهه أو ملابسه
+      if (persons.some((b) => inter(p.bbox, b) / area(p.bbox) > 0.6 && area(p.bbox) / area(b) > 0.35) && p.score < 0.9) continue;
+      frame.push(p);
+    }
+    L.detHist = [...(L.detHist || []).slice(-3), frame];
+    return frame.filter((p) => L.detHist.filter((f) => f.some((q) => q.class === p.class)).length >= 3);
   }
   function stopVision() { clearInterval(L.detectTimer); clearInterval(L.snapTimer); L.detectTimer = L.snapTimer = null; visPill.style.display = 'none'; }
   function toggleVision() { L.visionOn = !L.visionOn; if (L.visionOn) { if (L.media) startVision(); else toast('شغّل الكاميرا أو الشاشة'); } else stopVision(); }
@@ -224,16 +243,32 @@ export async function renderLive(app, id) {
     c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
     send({ type: 'snapshot', auto, dataUrl: c.toDataURL('image/jpeg', 0.75) }, auto);
   }
-  function toggleSpeech() {
+  // السماع بالصوت شغال افتراضياً — كلامك يوصل للجمهور بس ما ينعرض في الدردشة أبداً
+  function onSpeech(text) { text = String(text || '').trim(); if (text.length >= 2) send({ type: 'voice', text }, true); }
+  window.__alaSpeech = onSpeech; window.__alaSpeechOn = () => !!(L && L.speechOn); // للاختبار
+  function startSpeech(quiet) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return toast('المتصفح لا يدعم التعرف على الصوت (استخدم Chrome أو Edge)', 4000);
-    if (L.speechOn) { L.speechOn = false; L.speech.stop(); micPill.style.display = 'none'; return; }
-    const sr = new SR(); sr.lang = /[a-z]/i.test(m.streamerName || '') && !/[\u0600-\u06FF]/.test(m.streamerName || '') ? 'en-US' : 'ar-SA'; sr.continuous = true; sr.interimResults = false;
-    sr.onresult = (ev) => { let fin = ''; for (let i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) fin += ev.results[i][0].transcript; if (fin.trim()) send({ type: 'voice', text: fin.trim() }, true); };
-    sr.onerror = (e) => { if (e.error === 'not-allowed') { toast('اسمح باستخدام المايك'); L.speechOn = false; micPill.style.display = 'none'; } };
-    sr.onend = () => { if (L && L.speechOn) try { sr.start(); } catch {} };
-    L.speech = sr; L.speechOn = true; sr.start(); micPill.style.display = ''; toast('يسمع اسمك بالصوت — كلامك ما يظهر في الدردشة');
+    if (!SR) { if (!quiet || !L.srWarned) toast('المتصفح لا يدعم السماع بالصوت — استخدم Chrome أو Edge، أو اكتب لهم', 5000); L.srWarned = true; return; }
+    if (L.speechOn) return;
+    const sr = new SR(); sr.lang = /[a-z]/i.test(m.streamerName || '') && !/[\u0600-\u06FF]/.test(m.streamerName || '') ? 'en-US' : 'ar-SA'; sr.continuous = true; sr.interimResults = false; sr.maxAlternatives = 1;
+    sr.onresult = (ev) => { let fin = ''; for (let i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) fin += ev.results[i][0].transcript + ' '; onSpeech(fin); };
+    sr.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        L.speechOn = false; micPill.style.display = 'none';
+        if (!L.srGesture) { L.srGesture = true; toast('اضغط في أي مكان عشان يسمعونك (اسمح بالمايك)', 5000); document.addEventListener('click', () => L && startSpeech(true), { once: true }); }
+        else toast('اسمح باستخدام المايك عشان يسمعونك');
+      }
+    };
+    sr.onend = () => { if (L && L.speechOn) setTimeout(() => { if (L && L.speechOn) try { sr.start(); } catch {} }, 250); };
+    L.speech = sr; L.speechOn = true;
+    try { sr.start(); micPill.style.display = ''; if (!quiet) toast('يسمعونك بالصوت — كلامك ما يظهر في الدردشة'); }
+    catch { L.speechOn = false; document.addEventListener('click', () => L && startSpeech(true), { once: true }); }
   }
+  function toggleSpeech() {
+    if (L.speechOn) { L.speechOn = false; L.userMuted = true; L.speech && L.speech.stop(); micPill.style.display = 'none'; toast('وقف السماع'); return; }
+    L.userMuted = false; startSpeech(false);
+  }
+  setTimeout(() => { if (L && !L.userMuted) startSpeech(true); }, 800);
   function toggleRec() {
     if (L.rec && L.rec.state === 'recording') { L.rec.stop(); return; }
     if (!L.media) return toast('شغّل الكاميرا أو الشاشة أولاً');
@@ -248,4 +283,6 @@ export async function renderLive(app, id) {
   }
   L.timer = setInterval(() => { clock.textContent = fmtDur(Date.now() - L.started); drawTyping(); }, 1000);
 }
+const CONFUSABLE = new Set(['cell phone', 'remote', 'mouse', 'scissors', 'toothbrush', 'knife', 'fork', 'spoon', 'banana', 'hot dog', 'tie', 'skateboard', 'kite', 'baseball bat', 'baseball glove', 'frisbee', 'sports ball', 'teddy bear', 'hair drier', 'handbag', 'umbrella', 'surfboard', 'skis', 'snowboard', 'tennis racket', 'carrot', 'donut', 'sandwich', 'pizza', 'cake', 'bowl', 'wine glass', 'vase', 'clock']);
+const OUTDOOR = new Set(['car', 'truck', 'bus', 'motorcycle', 'bicycle', 'airplane', 'train', 'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'bench']);
 function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.append(s); }); }

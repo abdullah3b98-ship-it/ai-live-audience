@@ -363,6 +363,8 @@ const BANKS = {
   english,
 };
 
+require('./streamer-replies').installStreamerReplies(BANKS);
+
 // الجنسيات: [الرمز، الاسم، العلم، اللهجات، الوزن الافتراضي]
 const NATIONALITIES = {
   SA: { name: 'السعودية', flag: '🇸🇦', dialects: ['saudi_najdi', 'saudi_najdi', 'saudi_hijazi'], weight: 30 },
