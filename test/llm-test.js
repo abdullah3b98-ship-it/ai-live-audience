@@ -1,0 +1,21 @@
+const WebSocket = require('ws');
+const B = 'http://localhost:3000';
+const j = (u, b) => fetch(B + u, { method: b ? 'POST' : 'GET', headers: { 'content-type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }).then((r) => r.json());
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+(async () => {
+  console.log('save:', (await j('/api/settings', { llm: { provider: 'custom', model: 'mock', baseUrl: 'http://localhost:3999/v1', apiKey: 'test-key' } })).llm.active);
+  console.log('test:', await j('/api/settings/test-llm', {}));
+  const settings = { total: 8, mode: 'random', activity: 90, streamerName: 'أبو سلطان' };
+  const aud = await j('/api/audience/preview', settings);
+  const { id } = await j('/api/streams/start', { title: 'اختبار LLM', settings, personas: aud });
+  const ws = new WebSocket('ws://localhost:3000/ws?stream=' + id); const got = [];
+  ws.on('message', (d) => { const m = JSON.parse(d); if (m.type === 'message' && m.msg.pid) got.push(m.msg); });
+  await new Promise((r) => ws.on('open', r)); await sleep(6000);
+  ws.send(JSON.stringify({ type: 'chat', text: 'السلام عليكم وش رأيكم بالبث؟' })); await sleep(9000);
+  ws.send(JSON.stringify({ type: 'chat', text: `@${aud[0].username} وش رأيك؟` })); await sleep(6000);
+  await j(`/api/streams/${id}/end`, {});
+  const llmMsgs = got.filter((m) => m.text.includes('[LLM'));
+  console.log(`LLM msgs ${llmMsgs.length}/${got.length}`); llmMsgs.slice(0, 6).forEach((m) => console.log('  ', m.kind, m.username, m.text));
+  console.log('reset:', (await j('/api/settings', { llm: { provider: 'local', apiKey: '' } })).llm.active);
+  process.exit(0);
+})();

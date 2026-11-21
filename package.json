@@ -1,0 +1,30 @@
+{
+  "name": "ai-live-audience",
+  "version": "1.0.0",
+  "description": "جمهور AI مباشر: شخصيات افتراضية تتفاعل مع بثك",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node --experimental-sqlite --no-warnings server/index.js",
+    "test:smoke": "node test/smoke.js",
+    "test:e2e": "node test/e2e.js",
+    "test:memory": "node test/memory-test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^5.3.0",
+    "multer": "^2.5.0",
+    "ws": "^8.23.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.1"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^13.2.0"
+  }
+}

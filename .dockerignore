@@ -1,0 +1,5 @@
+node_modules
+/data
+*.y4m
+screenshots
+.app-password

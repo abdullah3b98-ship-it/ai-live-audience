@@ -1,0 +1,31 @@
+// يتحقق أن الذاكرة والجنسية واللهجة والكلمات المتعلمة تبقى بعد إعادة تشغيل الخادم
+const WebSocket = require('ws');
+const B = process.env.BASE || 'http://localhost:3000';
+const j = (u, b, m) => fetch(B + u, { method: m || (b ? 'POST' : 'GET'), headers: { 'content-type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }).then((r) => r.json());
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+(async () => {
+  const streams = await j('/api/streams');
+  const prev = streams.find((s) => !s.live && s.persona_ids.length);
+  console.log('previous stream:', prev.id, prev.title, 'personas:', prev.persona_ids.length);
+  const before = await Promise.all(prev.persona_ids.slice(0, 5).map((id) => j('/api/personas/' + id)));
+  console.log('identity persisted:', before.map((p) => `${p.username}=${p.nationality}/${p.dialect}/${p.memories.length} mem/${p.words.length} words`).join(' ; '));
+  const settings = { mode: 'manual', handpicked: prev.persona_ids, activity: 100, debate: 40, memory: true, streamerName: 'أبو سلطان', politeness: 'mixed' };
+  const aud = await j('/api/audience/preview', settings);
+  const { id } = await j('/api/streams/start', { title: 'بث ثاني - اختبار الذاكرة', game: 'FIFA 25', settings, personas: aud });
+  const ws = new WebSocket(B.replace('http', 'ws') + '/ws?stream=' + id);
+  const got = [];
+  ws.on('message', (d) => { const m = JSON.parse(d); if (m.type === 'message' && m.msg.pid) { got.push(m.msg); if (/remember|joke_old|greet_back|named/.test(m.msg.intent) || /زقنبي|دلخ|ريموت|بلايستيشن/.test(m.msg.text)) console.log(`  [${m.msg.intent}] ${m.msg.username}: ${m.msg.text}`); } });
+  await new Promise((r) => ws.on('open', r));
+  await sleep(15000);
+  ws.send(JSON.stringify({ type: 'chat', text: 'مره واحد محشش شاف مطب قال الشارع منتفخ ليش؟' }));
+  await sleep(15000);
+  ws.send(JSON.stringify({ type: 'chat', text: 'الحارس اليوم زقنبي والله' }));
+  await sleep(10000);
+  ws.send(JSON.stringify({ type: 'detect', objects: [{ label: 'remote', score: 0.8, bbox: [0.4, 0.3, 0.2, 0.2] }] }));
+  await sleep(60000);
+  await j(`/api/streams/${id}/end`, {});
+  const intents = {}; got.forEach((m) => (intents[m.intent] = (intents[m.intent] || 0) + 1));
+  console.log('intents:', JSON.stringify(intents));
+  console.log('remember msgs:', got.filter((m) => m.intent === 'remember').length, ' joke_old:', got.filter((m) => m.intent === 'joke_old').length, ' greet_back:', got.filter((m) => m.intent === 'greet_back').length);
+  process.exit(0);
+})();
