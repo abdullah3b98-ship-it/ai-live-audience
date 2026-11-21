@@ -5,6 +5,8 @@ import { renderPersonas } from './personas.js';
 import { renderStreams, renderStream } from './history.js';
 import { renderMemory } from './memory.js';
 import { renderSettings } from './settings.js';
+import { ic } from './icons.js';
+$$('#nav a').forEach((a) => a.prepend(ic(a.dataset.i, 17)));
 
 async function route() {
   const hash = location.hash.replace(/^#/, '') || '/';
@@ -29,7 +31,7 @@ async function route() {
 export async function updateLiveLink() {
   const m = await meta(true).catch(() => null);
   const el = $('#liveLink'); el.innerHTML = '';
-  if (m && m.activeStreams.length && !location.hash.startsWith('#/live')) el.append(h('a', { href: '#/live/' + m.activeStreams[0] }, '● ارجع للبث'));
+  if (m && m.activeStreams.length && !location.hash.startsWith('#/live')) el.append(h('a', { href: '#/live/' + m.activeStreams[0] }, ic('radio', 16), h('span', {}, 'ارجع للبث')));
 }
 window.addEventListener('hashchange', route);
 route();

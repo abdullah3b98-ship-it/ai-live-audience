@@ -8,12 +8,12 @@ export async function renderSettings(app) {
   const base = h('input', { type: 'text', value: L.baseUrl, placeholder: 'Base URL (اختياري)' });
   const key = h('input', { type: 'password', placeholder: L.hasKey ? `محفوظ: ${L.keyPreview} — اتركه فارغاً للإبقاء عليه` : 'الصق مفتاح API هنا', autocomplete: 'off' });
   const status = h('div', { class: 'small' });
-  const showStatus = (l) => { status.innerHTML = ''; status.append(l.active ? h('span', { style: { color: 'var(--green)' } }, `✅ مفعّل: ${l.active.provider} · ${l.active.model}${l.active.vision ? ' · يدعم الصور' : ''}`) : h('span', { class: 'muted' }, '⚙️ يعمل الآن بالمحرك المحلي (قوالب لهجات + قواعد) — كل الميزات تعمل بدون مفتاح.'), l.envDetected ? h('div', { class: 'muted' }, `تم اكتشاف مفتاح في متغيرات البيئة: ${l.envDetected}`) : null); };
+  const showStatus = (l) => { status.innerHTML = ''; status.append(l.active ? h('span', { style: { color: 'var(--green)' } }, `مفعّل: ${l.active.provider} · ${l.active.model}${l.active.vision ? ' · يدعم الصور' : ''}`) : h('span', { class: 'muted' }, 'يعمل الآن بالمحرك المحلي (قوالب لهجات + قواعد) — كل الميزات تعمل بدون مفتاح.'), l.envDetected ? h('div', { class: 'muted' }, `تم اكتشاف مفتاح في متغيرات البيئة: ${l.envDetected}`) : null); };
   function fillDefaults() { const d = L.defaults[prov.value]; if (d) { model.placeholder = d.model || 'اسم النموذج'; base.placeholder = d.baseUrl || 'Base URL'; } }
   fillDefaults(); showStatus(L);
-  app.append(h('h1', {}, '⚙️ الإعدادات'),
+  app.append(h('h1', {}, 'الإعدادات'),
     h('div', { class: 'card' }, h('h2', {}, 'عام'), h('label', { class: 'f' }, 'اسمك (تناديك به الشخصيات)', name), h('button', { class: 'btn pri', style: { marginTop: '8px' }, onclick: async () => { await api('/api/settings', { streamerName: name.value }); const s = JSON.parse(localStorage.getItem('audienceSettings') || '{}'); s.streamerName = name.value; localStorage.setItem('audienceSettings', JSON.stringify(s)); toast('تم الحفظ'); } }, 'حفظ')),
-    h('div', { class: 'card' }, h('h2', {}, '🤖 مزود الذكاء الاصطناعي'),
+    h('div', { class: 'card' }, h('h2', {}, 'مزود الذكاء الاصطناعي'),
       h('p', { class: 'muted small' }, 'التطبيق يعمل بالكامل بدون مفتاح. عند إضافة مفتاح، تُولَّد الردود بنموذج لغوي مع بقاء نظام الأدوار والتوقيت ومنع التكرار والسلامة محلياً، ويرجع للمحرك المحلي تلقائياً عند أي خطأ.'),
       h('div', { class: 'grid2' }, h('label', { class: 'f' }, 'المزود', prov), h('label', { class: 'f' }, 'النموذج', model), h('label', { class: 'f' }, 'Base URL', base), h('label', { class: 'f' }, 'مفتاح API', key)),
       h('div', { class: 'row', style: { marginTop: '10px' } },

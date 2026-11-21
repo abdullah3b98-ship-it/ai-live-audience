@@ -82,7 +82,7 @@ async function explainWord(word, context) {
 
 async function recognizeImage(dataUrl) {
   const c = config(); if (!c || !c.vision) throw new Error('no-vision');
-  const out = await chat([{ role: 'system', content: 'Identify the main object the person is holding or showing to the camera. Return JSON only: {"name_ar":"...","name_en":"...","confidence":0-1,"bbox":[x,y,w,h] normalized 0-1 or null}' }, { role: 'user', content: [{ type: 'text', text: 'What is this?' }, { type: 'image_url', image_url: { url: dataUrl } }] }], { json: true, temperature: 0.1, maxTokens: 200 });
+  const out = await chat([{ role: 'system', content: 'You see one frame from a live stream (camera or shared screen). Identify the most notable object or thing in it (prefer what the person is holding or showing; for a screen, what is on it, e.g. a game name). Return JSON only: {"name_ar":"short Arabic name","name_en":"short English name","description":"one short Arabic sentence","confidence":0-1,"bbox":[x,y,w,h] normalized 0-1 or null}' }, { role: 'user', content: [{ type: 'text', text: 'What is this?' }, { type: 'image_url', image_url: { url: dataUrl } }] }], { json: true, temperature: 0.1, maxTokens: 200 });
   return parseJson(out);
 }
 

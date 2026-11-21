@@ -81,6 +81,7 @@ function findInLexicon(text) {
 
 // أسماء أشياء COCO-SSD بالعربي
 const OBJECT_AR = {
+  'bicycle': 'سيكل', 'motorcycle': 'دباب', 'airplane': 'طيارة', 'bus': 'باص', 'train': 'قطار', 'truck': 'شاحنة', 'boat': 'قارب', 'traffic light': 'إشارة مرور', 'fire hydrant': 'حنفية إطفاء', 'stop sign': 'لوحة قف', 'parking meter': 'عداد مواقف', 'bench': 'كرسي حديقة', 'horse': 'حصان', 'sheep': 'خروف', 'cow': 'بقرة', 'elephant': 'فيل', 'bear': 'دب', 'zebra': 'حمار وحشي', 'giraffe': 'زرافة', 'suitcase': 'شنطة سفر', 'frisbee': 'فريسبي', 'skis': 'زلاجات', 'snowboard': 'لوح تزلج', 'kite': 'طيارة ورقية', 'baseball bat': 'مضرب', 'baseball glove': 'قفاز بيسبول', 'skateboard': 'سكيت بورد', 'surfboard': 'لوح ركمجة', 'tennis racket': 'مضرب تنس', 'broccoli': 'بروكلي', 'carrot': 'جزر', 'hot dog': 'هوت دوق', 'dining table': 'طاولة', 'toilet': 'حمام', 'microwave': 'مايكرويف', 'oven': 'فرن', 'toaster': 'محمصة', 'sink': 'مغسلة', 'refrigerator': 'ثلاجة',
   person: 'شخص', 'cell phone': 'جوال', remote: 'ريموت', cup: 'كوب', bottle: 'قارورة', laptop: 'لابتوب', keyboard: 'كيبورد',
   mouse: 'ماوس', book: 'كتاب', scissors: 'مقص', 'teddy bear': 'دبدوب', cat: 'قطة', dog: 'كلب', chair: 'كرسي', tv: 'شاشة',
   clock: 'ساعة', backpack: 'شنطة', banana: 'موزة', apple: 'تفاحة', orange: 'برتقالة', donut: 'دونات', pizza: 'بيتزا',

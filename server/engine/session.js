@@ -44,14 +44,25 @@ class LiveSession {
     this.relCache = new Map();
   }
 
-  start() {
-    const ids = [...this.parts.keys()].sort(() => Math.random() - 0.5);
-    ids.forEach((id, i) => { const d = i < ids.length * 0.4 ? rnd(0, 1500) : rnd(3000, 35000); setTimeout(() => this.join(id, true), d); });
-    if (this.game) setTimeout(() => this.record('game', this.game, 0.6, { game: this.game }), 40000);
+  start({ resumed = false } = {}) {
+    this.resumed = resumed;
     this.timer = setInterval(() => this.tick(), 200);
-    this.nextIdle = Date.now() + 6000;
+    this.nextIdle = Date.now() + 8000;
+    // الدخول يبدأ لما تفتح صفحة البث (begin)، ومع احتياط لو ما اتصلت الصفحة
+    this.beginFallback = setTimeout(() => this.begin(), 12000);
   }
-  stop() { clearInterval(this.timer); this.stopped = true; }
+  // دخول تدريجي واضح: العدد يزيد قدامك ورسالة دخول لكل واحد
+  begin() {
+    if (this.begun || this.stopped) return; this.begun = true; clearTimeout(this.beginFallback);
+    const ids = [...this.parts.keys()].filter((id) => !this.parts.get(id).present).sort(() => Math.random() - 0.5);
+    const fast = this.resumed ? ids.length : Math.ceil(ids.length * 0.6);
+    let t = 900;
+    ids.forEach((id, i) => { setTimeout(() => this.join(id, true, i), t); t += i < fast ? rnd(700, 2600) : rnd(4000, 14000); });
+    if (this.resumed) this.system('رجع الاتصال بالبث، الجمهور يرجع يدخل');
+    if (this.game) setTimeout(() => this.record('game', this.game, 0.6, { game: this.game }), 40000);
+    this.nextIdle = Date.now() + 7000;
+  }
+  stop() { clearInterval(this.timer); clearTimeout(this.beginFallback); this.stopped = true; }
 
   // ---------- أدوات ----------
   present() { return [...this.parts.values()].filter((x) => x.present && !x.kicked); }
@@ -75,15 +86,17 @@ class LiveSession {
   }
 
   // ---------- الدخول ----------
-  join(id, auto = false) {
+  join(id, auto = false, order = 99) {
     const x = this.parts.get(id); if (!x || this.stopped) return;
     if (x.kicked && auto) return; if (x.p.status === 'banned') return;
     if (x.present) return;
     x.present = true; this.everPresent.add(id);
-    this.emit({ type: 'join', pid: id, username: x.p.username });
+    this.emit({ type: 'join', pid: id, username: x.p.username, avatar: x.p.avatar_url, viewers: this.present().length });
     this.pushRoster();
     const t = x.p.traits;
-    if (!t.onlyWhenCalled && Math.random() < 0.25 + t.talk * 0.5) this.schedule(x, { kind: 'join', memory: this.memoryOn && x.p.streams_attended > 0 ? memory.recall(x.p.id, this.id, x.p.language) : null }, rnd(1500, 6000));
+    // أول الداخلين يسلمون غالباً عشان الدردشة تبدأ بسرعة
+    const greetP = order < 4 ? 0.85 : 0.25 + t.talk * 0.5;
+    if (!t.onlyWhenCalled && Math.random() < greetP) this.schedule(x, { kind: 'join', memory: this.memoryOn && x.p.streams_attended > 0 ? memory.recall(x.p.id, this.id, x.p.language) : null }, rnd(1500, 6000));
     else if (Math.random() < t.reactsNonText) setTimeout(() => this.react(x, pick(REACTIONS.greet)), rnd(1000, 4000));
   }
   addPersonaLive(p) {
@@ -229,8 +242,11 @@ class LiveSession {
   async streamerSays(text, { voice = false } = {}) {
     text = String(text || '').trim().slice(0, 500); if (!text) return;
     this.lastEventAt = Date.now();
-    this.saveMsg(null, text, voice ? 'voice' : 'streamer');
-    this.emit({ type: 'message', msg: { id: 'u' + Date.now(), kind: voice ? 'voice' : 'streamer', text, ts: Date.now(), username: this.streamer || 'أنت' } });
+    // كلامك بالصوت ما يظهر في الدردشة ولا يُحفظ كرسالة — يُستخدم بصمت لفهم المناداة والأحداث فقط
+    if (!voice) {
+      this.saveMsg(null, text, 'streamer');
+      this.emit({ type: 'message', msg: { id: 'u' + Date.now(), kind: 'streamer', text, ts: Date.now(), username: this.streamer || 'أنت' } });
+    }
     const arabic = /[\u0600-\u06FF]/.test(text);
 
     // 1) تعليم كلمة / تأكيد تخمين / تعليم شيء
@@ -361,6 +377,7 @@ class LiveSession {
       const ps = this.present().filter((x) => this.canSpeak(x) && !x.p.traits.onlyWhenCalled);
       if (!ps.length) return;
       const ar = learning.OBJECT_AR[o.label] || o.label;
+      if (known && known.value === o.label && ar !== o.label) known.value = ar; // اسم محفوظ بالإنجليزي قديماً
       if (known && known.status === 'confirmed') {
         this.emit({ type: 'highlight', bbox: o.bbox, label: o.label, guess: known.value, score: o.score, known: true });
         ps.sort(() => Math.random() - 0.5).slice(0, 2).forEach((x, i) => this.schedule(x, { kind: 'object' }, rnd(1500, 4000) + i * 2000, { text: phrase(x.p, 'object_known', { o: x.p.language === 'en' ? o.label : known.value }, this.guard), regen: () => phrase(x.p, 'object_known', { o: x.p.language === 'en' ? o.label : known.value }, this.guard) }));
@@ -376,27 +393,51 @@ class LiveSession {
         this.schedule(asker, { kind: 'object' }, rnd(1500, 3000), { text: phrase(asker.p, 'object_ask', { s: this.streamer }, this.guard), priority: true });
         const guesser = ps.find((x) => x !== asker);
         if (guesser) this.schedule(guesser, { kind: 'object' }, rnd(3500, 6000), { text: phrase(guesser.p, 'object_guess', { o: guesser.p.language === 'en' ? o.label : ar }, this.guard), regen: () => phrase(guesser.p, 'object_guess', { o: guesser.p.language === 'en' ? o.label : ar }, this.guard) });
-        if (this.researchOn) learning.wikiSummary(o.label === 'remote' ? 'Remote control' : o.label).then((d) => d && learning.saveObject(o.label, ar, 'guess', 'vision+web', d));
+        // يتعلمون بأنفسهم: لو ما صححتهم خلال ثواني، يعتمدون اللي شافوه ويحفظونه
+        const label = o.label;
+        setTimeout(async () => {
+          if (this.stopped || !this.pendingObject || this.pendingObject.label !== label) return;
+          this.pendingObject = null;
+          const d = this.researchOn ? await learning.wikiSummary(label === 'remote' ? 'Remote control' : label).catch(() => null) : null;
+          this.selfLearnObject(label, ar, d || null, asker);
+        }, rnd(9000, 13000));
       } else {
-        learning.saveObject(o.label, ar, 'guess', 'vision');
         this.schedule(asker, { kind: 'object' }, rnd(2000, 4000), { text: phrase(asker.p, 'object_guess', { o: asker.p.language === 'en' ? o.label : ar }, this.guard), regen: () => phrase(asker.p, 'object_guess', { o: asker.p.language === 'en' ? o.label : ar }, this.guard) });
+        learning.saveObject(o.label, ar, 'confirmed', 'self-vision');
+        this.record('object', ar, 0.55, { name: ar, name_en: o.label });
       }
     }
   }
-  async snapshot(dataUrl) {
-    if (!llm.config()?.vision) { this.system('التعرف بالذكاء الاصطناعي يحتاج مفتاح API يدعم الصور (الإعدادات). حالياً يُستخدم الكشف المحلي في المتصفح.'); return; }
+  // حفظ شيء تعلموه بأنفسهم من الكاميرا (بدون ما تعلمهم)
+  selfLearnObject(label, name, desc, by) {
+    learning.saveObject(label, name, 'confirmed', 'self-vision', desc || null);
+    this.record('object', name, 0.6, { name, name_en: label });
+    this.emit({ type: 'learned', object: { label, name } });
+    const ps = this.present().filter((x) => this.canSpeak(x) && !x.p.traits.onlyWhenCalled);
+    const x = (by && this.canSpeak(by) ? by : null) || ps[Math.floor(Math.random() * ps.length)];
+    if (x) this.schedule(x, { kind: 'object' }, rnd(800, 2000), { text: phrase(x.p, 'object_learned', { o: x.p.language === 'en' ? label : name }, this.guard), regen: () => phrase(x.p, 'object_learned', { o: x.p.language === 'en' ? label : name }, this.guard) });
+  }
+  async snapshot(dataUrl, auto = false) {
+    if (!llm.config()?.vision) { if (!auto) this.system('التعرف الذكي على الصور يحتاج مفتاح API يدعم الصور (الإعدادات). حالياً يُستخدم الكشف المحلي في المتصفح.'); return; }
+    if (auto) { if (this.visionBusy || Date.now() - (this.lastVision || 0) < 30000) return; this.visionBusy = true; this.lastVision = Date.now(); }
     try {
       const r = await llm.recognizeImage(dataUrl); if (!r) return;
       const label = (r.name_en || 'object').toLowerCase();
       if (r.bbox) this.emit({ type: 'highlight', bbox: r.bbox, label, guess: r.name_ar });
       const known = learning.getObject(label);
       const ps = this.present().filter((x) => this.canSpeak(x) && !x.p.traits.onlyWhenCalled);
-      const x = ps.sort((a, b) => b.p.traits.curiosity - a.p.traits.curiosity)[0]; if (!x) return;
+      const x = ps.sort((a, b) => b.p.traits.curiosity - a.p.traits.curiosity + rnd(-0.3, 0.3))[0]; if (!x) return;
+      if (auto) {
+        if (known && known.status === 'confirmed') { if (Math.random() < 0.35) this.schedule(x, { kind: 'object' }, 1500, { text: phrase(x.p, 'object_known', { o: known.value }, this.guard) }); return; }
+        this.schedule(x, { kind: 'object' }, 1500, { text: phrase(x.p, 'object_guess', { o: r.name_ar || label }, this.guard) });
+        if ((r.confidence || 0) >= 0.55) setTimeout(() => this.selfLearnObject(label, r.name_ar || label, r.description, ps.find((o) => o !== x)), rnd(3500, 6000));
+        return;
+      }
       if (known && known.status === 'confirmed') return this.schedule(x, { kind: 'object' }, 1500, { text: phrase(x.p, 'object_known', { o: known.value }, this.guard), regen: () => phrase(x.p, 'object_known', { o: known.value }, this.guard) });
       learning.saveObject(label, r.name_ar, 'guess', 'llm-vision');
       this.pendingObject = { label, ts: Date.now() };
       this.schedule(x, { kind: 'object' }, 1500, { text: (r.confidence || 0) > 0.75 ? phrase(x.p, 'object_guess', { o: r.name_ar }, this.guard) : phrase(x.p, 'object_ask', { s: this.streamer }, this.guard), priority: true });
-    } catch (e) { this.system('تعذر تحليل الصورة: ' + e.message); }
+    } catch (e) { if (!auto) this.system('تعذر تحليل الصورة: ' + e.message); } finally { if (auto) this.visionBusy = false; }
   }
   teachObject(label, name) {
     learning.saveObject(label, name, 'confirmed', 'user');

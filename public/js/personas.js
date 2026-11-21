@@ -6,10 +6,10 @@ export function personaCard(p, { onClick, actions = [], selected, editableName, 
   const name = editableName ? h('input', { class: 'name', value: p.username, onclick: (e) => e.stopPropagation(), onchange: (e) => onName(e.target.value) }) : h('div', { class: 'name', title: p.username }, p.username);
   return h('div', { class: 'pc' + (selected ? ' sel' : '') + (p.status === 'banned' ? ' banned' : ''), onclick: onClick },
     h('div', { class: 'acts' }, actions),
-    h('div', { class: 'top' }, img, h('div', { style: { minWidth: 0 } }, name, h('div', { class: 'small muted' }, (p.gender === 'f' ? '♀ بنت' : '♂ ولد'), ' · ', p.nat?.flag || '', ' ', p.nat?.name || ''))),
-    h('div', { class: 'small' }, h('span', { class: 'tag' }, p.dialect_name), h('span', { class: 'tag' }, '⭐ ' + p.reputation)),
+    h('div', { class: 'top' }, img, h('div', { style: { minWidth: 0 } }, name, h('div', { class: 'small muted' }, (p.gender === 'f' ? 'بنت' : 'ولد'), ' · ', p.nat?.flag || '', ' ', p.nat?.name || ''))),
+    h('div', { class: 'small' }, h('span', { class: 'tag' }, p.dialect_name), h('span', { class: 'tag' }, '' + p.reputation)),
     h('div', { class: 'small muted', style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, p.archetype_label),
-    p.favorite || p.status === 'banned' || p.streams_attended ? h('div', { class: 'small' }, p.favorite ? h('span', { class: 'fav' }, '★ مفضلة ') : '', p.status === 'banned' ? h('span', { style: { color: '#ff8a80' } }, '⛔ محظور ') : '', !p.allow_return && p.status !== 'banned' ? h('span', { class: 'muted' }, '🚪 مطرود ') : '', p.streams_attended ? h('span', { class: 'muted' }, `· حضر ${p.streams_attended} بث`) : '') : null);
+    p.favorite || p.status === 'banned' || p.streams_attended ? h('div', { class: 'small' }, p.favorite ? h('span', { class: 'fav' }, '★ مفضلة ') : '', p.status === 'banned' ? h('span', { style: { color: '#ff8a80' } }, 'محظور ') : '', !p.allow_return && p.status !== 'banned' ? h('span', { class: 'muted' }, 'مطرود ') : '', p.streams_attended ? h('span', { class: 'muted' }, `· حضر ${p.streams_attended} بث`) : '') : null);
 }
 
 export async function renderPersonas(app) {
@@ -18,7 +18,7 @@ export async function renderPersonas(app) {
   const q = h('input', { type: 'search', placeholder: 'بحث بالاسم…', oninput: draw });
   const fg = h('select', { onchange: draw }, h('option', { value: '' }, 'الكل'), h('option', { value: 'f' }, 'بنات'), h('option', { value: 'm' }, 'أولاد'));
   const fn = h('select', { onchange: draw }, h('option', { value: '' }, 'كل الجنسيات'), Object.entries(m.nationalities).map(([k, v]) => h('option', { value: k }, v.flag + ' ' + v.name)));
-  const fs = h('select', { onchange: draw }, h('option', { value: '' }, 'كل الحالات'), h('option', { value: 'fav' }, '★ المفضلة'), h('option', { value: 'banned' }, '⛔ المحظورين'), h('option', { value: 'kicked' }, '🚪 المطرودين'));
+  const fs = h('select', { onchange: draw }, h('option', { value: '' }, 'كل الحالات'), h('option', { value: 'fav' }, '★ المفضلة'), h('option', { value: 'banned' }, 'المحظورين'), h('option', { value: 'kicked' }, 'المطرودين'));
   const grid = h('div', { class: 'pgrid' });
   const count = h('span', { class: 'muted' });
   function draw() {
@@ -30,11 +30,11 @@ export async function renderPersonas(app) {
   }
   async function reload() { list = await api('/api/personas'); draw(); }
   const ng = h('select', {}, h('option', { value: '' }, 'جنس عشوائي'), h('option', { value: 'f' }, 'بنت'), h('option', { value: 'm' }, 'ولد'));
-  app.append(h('h1', {}, '👥 مكتبة الشخصيات'),
+  app.append(h('h1', {}, 'مكتبة الشخصيات'),
     h('div', { class: 'card' }, h('div', { class: 'row' }, h('div', { class: 'grow' }, q), fg, fn, fs, count),
       h('div', { class: 'row', style: { marginTop: '10px' } }, ng,
         h('button', { class: 'btn pri', onclick: async () => { const p = await api('/api/personas', { gender: ng.value || undefined }); await reload(); editPersona(p.id, reload); } }, '+ شخصية جديدة'),
-        h('button', { class: 'btn', onclick: async () => { await api('/api/personas/generate', { count: 10, gender: ng.value || undefined }); reload(); toast('تم توليد 10 شخصيات'); } }, '🎲 توليد 10 عشوائياً'))),
+        h('button', { class: 'btn', onclick: async () => { await api('/api/personas/generate', { count: 10, gender: ng.value || undefined }); reload(); toast('تم توليد 10 شخصيات'); } }, 'توليد 10 عشوائياً'))),
     grid);
   draw();
 }
@@ -79,16 +79,16 @@ export async function editPersona(id, onSaved) {
   };
   const dlg = modal('تعديل الشخصية', h('div', {},
     h('div', { class: 'row' }, avatar, h('div', { class: 'grow' }, h('div', { class: 'row' }, h('label', { class: 'f grow' }, 'اسم المستخدم', name), h('label', { class: 'f' }, 'الجنس', gender)),
-      h('div', { class: 'small muted', style: { marginTop: '6px' } }, `⭐ السمعة: ${p.reputation} · حضر ${p.streams_attended} بث · ${p.msg_count} رسالة · ضحك ${p.laughs} · انتقد ${p.criticisms} · طقطق ${p.teases}`))),
+      h('div', { class: 'small muted', style: { marginTop: '6px' } }, `السمعة: ${p.reputation} · حضر ${p.streams_attended} بث · ${p.msg_count} رسالة · ضحك ${p.laughs} · انتقد ${p.criticisms} · طقطق ${p.teases}`))),
     h('p', { class: 'muted small' }, 'اضغط على الصورة لتغييرها (مكتبة / رفع / توليد). الجنسية واللهجة ثابتة عبر البثوث ولا تتغير إلا إذا غيرتها هنا.'),
     h('div', { class: 'grid2' },
       h('div', {}, h('h3', {}, 'الهوية'), h('label', { class: 'f' }, 'الجنسية', nat), h('label', { class: 'f' }, 'اللهجة / اللغة', dial), h('label', { class: 'f' }, 'نمط الشخصية', arch),
         h('h3', {}, 'المعرفة الثقافية (اللهجات التي يفهمها تلقائياً)'), famBox, h('h3', {}, 'الاهتمامات'), intBox),
       h('div', {}, h('h3', {}, 'الطباع'), trWrap, h('label', { class: 'toggle' }, onlyCalled, 'لا يكتب إلا إذا نودي باسمه'), h('label', { class: 'toggle' }, importantOnly, 'لا يتدخل إلا في الأحداث المهمة'))),
     h('div', { class: 'grid2' }, h('div', {}, h('h3', {}, 'أسلوب الكتابة'), h('label', { class: 'f' }, 'الإيموجي', emo), h('label', { class: 'f' }, 'طول الرسائل', len), mixEn, styleChecks),
-      h('div', {}, h('h3', {}, 'الحالة'), h('label', { class: 'toggle' }, fav, '★ مفضلة (تُضاف بسهولة لأي بث)'), h('label', { class: 'toggle' }, allow, 'مسموح يرجع تلقائياً للبثوث'), h('label', { class: 'toggle' }, banned, '⛔ محظور نهائياً'), bio,
+      h('div', {}, h('h3', {}, 'الحالة'), h('label', { class: 'toggle' }, fav, '★ مفضلة (تُضاف بسهولة لأي بث)'), h('label', { class: 'toggle' }, allow, 'مسموح يرجع تلقائياً للبثوث'), h('label', { class: 'toggle' }, banned, 'محظور نهائياً'), bio,
         h('h3', {}, 'كلمات تعلمها'), h('div', {}, p.words.length ? p.words.map((w) => h('span', { class: 'tag' }, `${w.word} = ${w.meaning}`)) : h('span', { class: 'muted small' }, 'لا شيء بعد')),
-        h('h3', {}, 'علاقاته مع الشخصيات'), h('div', {}, p.relations.length ? p.relations.map((r) => h('span', { class: 'tag' }, `${r.username} ${r.affinity > 0.15 ? '🤝' : r.affinity < -0.1 ? '⚔️' : '·'} (${r.interactions})`)) : h('span', { class: 'muted small' }, 'لا توجد تفاعلات بعد')))),
+        h('h3', {}, 'علاقاته مع الشخصيات'), h('div', {}, p.relations.length ? p.relations.map((r) => h('span', { class: 'tag' }, `${r.username} ${r.affinity > 0.15 ? '(صديق)' : r.affinity < -0.1 ? '(خصم)' : ''} (${r.interactions})`)) : h('span', { class: 'muted small' }, 'لا توجد تفاعلات بعد')))),
     h('h3', {}, 'الذاكرة طويلة المدى'), mems,
     h('div', { class: 'row', style: { marginTop: '14px' } }, h('button', { class: 'btn pri', onclick: save }, 'حفظ'), h('button', { class: 'btn red', onclick: async () => { if (confirm('حذف الشخصية نهائياً؟')) { await api('/api/personas/' + id, undefined, 'DELETE'); dlg.close(); onSaved && onSaved(); } } }, 'حذف الشخصية'))));
 }

@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node --experimental-sqlite --no-warnings server/index.js",
     "test:smoke": "node test/smoke.js",
-    "test:e2e": "node test/e2e.js",
+    "test:e2e": "node test/live-e2e.js",
     "test:memory": "node test/memory-test.js"
   },
   "keywords": [],
